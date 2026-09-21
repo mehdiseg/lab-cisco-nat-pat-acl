@@ -1,0 +1,38 @@
+enable
+configure terminal
+hostname R1
+interface g0/0
+ ip address 192.168.10.1 255.255.255.0
+ ip nat inside
+ no shutdown
+interface g0/1
+ ip address 203.0.113.2 255.255.255.252
+ ip nat outside
+ no shutdown
+!
+ip route 0.0.0.0 0.0.0.0 203.0.113.1
+!
+! --- PAT : tout le LAN sort avec l'adresse de g0/1
+access-list 1 permit 192.168.10.0 0.0.0.255
+ip nat inside source list 1 interface g0/1 overload
+!
+! --- NAT statique : le serveur web est joignable sur le port 8080 de l'adresse publique
+ip nat inside source static tcp 192.168.10.10 80 203.0.113.2 8080
+!
+! --- ACL étendue : interdire Telnet depuis le LAN (sauf la station d'administration vers le routeur), tout le reste passe
+ip access-list extended BLOQUE-TELNET
+ permit tcp host 192.168.10.100 host 192.168.10.1 eq 23
+ deny tcp any any eq 23
+ permit ip any any
+interface g0/0
+ ip access-group BLOQUE-TELNET in
+!
+! --- ACL standard : seule la station d'administration peut ouvrir une session sur le routeur
+access-list 10 permit host 192.168.10.100
+enable secret MotDePasseLab1
+line vty 0 4
+ password TelnetLab1
+ login
+ access-class 10 in
+end
+write memory
